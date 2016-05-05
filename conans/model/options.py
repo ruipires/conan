@@ -107,7 +107,7 @@ class Options(object):
             assert isinstance(values, OptionsValues)
             self._options.values = values._options
             for name, option_values in values._reqs_options.items():
-                self._reqs_options.setdefault(name, Values()).update(option_values)
+                self._reqs_options.setdefault(name, Values()).update_values(option_values)
 
     def validate(self):
         return self._options.validate()

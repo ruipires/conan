@@ -12,7 +12,7 @@ class PerformanceTest(unittest.TestCase):
     def deep_deps_test(self):
         client = TestClient()
         num = 250
-        deep = True
+        deep = False
         for i in range(num):
             if i == 0:
                 files = cpp_hello_conan_files("Hello0", "0.1")

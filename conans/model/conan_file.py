@@ -24,6 +24,8 @@ def create_options(conanfile):
             options.values = default_values
         return options
     except Exception as e:
+        import traceback
+        print traceback.format_exc()
         raise ConanException("Error while initializing options. %s" % str(e))
 
 
