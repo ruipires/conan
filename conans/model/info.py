@@ -1,5 +1,5 @@
 from conans.util.sha import sha1
-from conans.model.ref import  PackageReference
+from conans.model.ref import PackageReference
 from conans.errors import ConanException
 from conans.util.config_parser import ConfigParser
 from conans.util.files import load
@@ -33,8 +33,8 @@ class RequirementInfo(object):
 
     @property
     def sha(self):
-        return "/".join([str(n) for n in [self.name, self.version, self.user, self.channel,
-                                          self.package_id]])
+        return ("%s/%s/%s/%s/%s"
+                % (self.name, self.version, self.user, self.channel, self.package_id))
 
     def serialize(self):
         return str(self.package)
@@ -119,11 +119,14 @@ class RequirementsList(list):
 
 class ConanInfo(object):
 
+    def __init__(self):
+        self._settings_copy = False
+
     @staticmethod
     def create(settings, options, requires):
         result = ConanInfo()
         result.full_settings = settings
-        result.settings = settings.copy()
+        result._settings = settings
         result.full_options = options
         result.options = options.copy()
         result.options.clear_indirect()
@@ -131,13 +134,21 @@ class ConanInfo(object):
         result.requires = RequirementsInfo(requires)
         return result
 
+    @property
+    def settings(self):
+        # Lazy COW
+        if not self._settings_copy:
+            self._settings = self._settings.copy()
+            self._settings_copy = True
+        return self._settings
+
     @staticmethod
     def loads(text):
         parser = ConfigParser(text, ["settings", "full_settings", "options", "full_options",
                                      "requires", "full_requires"])
 
         result = ConanInfo()
-        result.settings = Values.loads(parser.settings)
+        result._settings = Values.loads(parser.settings)
         result.full_settings = Values.loads(parser.full_settings)
         result.options = OptionsValues.loads(parser.options)
         result.full_options = OptionsValues.loads(parser.full_options)
@@ -152,7 +163,7 @@ class ConanInfo(object):
         result = []
 
         result.append("[settings]")
-        result.append(indent(self.settings.dumps()))
+        result.append(indent(self._settings.dumps()))
         result.append("\n[requires]")
         result.append(indent(self.requires.dumps()))
         result.append("\n[options]")
@@ -189,13 +200,13 @@ class ConanInfo(object):
         options and settings
         """
         result = []
-        result.append(self.settings.sha)
+        result.append(self._settings.sha)
         result.append(self.options.sha)
         result.append(self.requires.sha)
         return sha1('\n'.join(result).encode())
 
     def serialize(self):
-        conan_info_json = {"settings": self.settings.serialize(),
+        conan_info_json = {"settings": self._settings.serialize(),
                            "full_settings": self.full_settings.serialize(),
                            "options": self.options.serialize(),
                            "full_options": self.full_options.serialize(),
@@ -206,7 +217,7 @@ class ConanInfo(object):
     @staticmethod
     def deserialize(data):
         res = ConanInfo()
-        res.settings = Values.deserialize(data["settings"])
+        res._settings = Values.deserialize(data["settings"])
         res.full_settings = Values.deserialize(data["full_settings"])
         res.options = OptionsValues.deserialize(data["options"])
         res.full_options = OptionsValues.deserialize(data["full_options"])

@@ -105,8 +105,8 @@ class Requirements(OrderedDict):
         if own_ref:
             new_reqs.pop(own_ref.name, None)
         for name, req in self.items():
-            if name in down_reqs:
-                other_req = down_reqs[name]
+            other_req = down_reqs.get(name)
+            if other_req:
                 # update dependency
                 other_ref = other_req.conan_reference
                 if other_ref and other_ref != req.conan_reference:

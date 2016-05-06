@@ -2,15 +2,11 @@ from conans.util.sha import sha1
 from conans.errors import ConanException
 import six
 
-"""
-SHA  ['optimized=3', 'static=True'] 8393e495c78151d27b26e5233e95a9e26b38e122
-SHA  ['thread=True', 'thread.multi=off'] eca2fe206fa6b78c8d179650183e5e4f336c565b
-SHA  ['deps_bundled=True'] dff9fb39569b7f795a3c4ea0759209fc4241a752
-"""
+
 class _ValuesProxy(object):
     def __init__(self, values, member):
-        self._values = values
-        self._member = member
+        object.__setattr__(self, '_values', values)
+        object.__setattr__(self, '_member', member)
 
     @property
     def _data(self):
@@ -49,8 +45,8 @@ class _ValuesProxy(object):
 
 class Values(object):
     def __init__(self):
-        self._data = {}
-        self._modified = {}
+        object.__setattr__(self, '_data', {})
+        object.__setattr__(self, '_modified', {})
 
     def serialize(self):
         return self.as_list()
@@ -70,13 +66,14 @@ class Values(object):
 
     def __setattr__(self, attr, value):
         if attr[0] == "_":
+            raise Exception("Booom")
             return super(Values, self).__setattr__(attr, value)
         self._data[attr] = str(value)
 
     def copy(self):
         result = Values()
-        result._data = self._data.copy()
-        result._modified = self._modified.copy()
+        object.__setattr__(result, '_data', self._data.copy())
+        # Not necessary result._modified = self._modified.copy()
         return result
 
     @staticmethod
@@ -93,7 +90,7 @@ class Values(object):
     def from_list(data):
         assert isinstance(data, list)
         result = Values()
-        result._data = dict(data)
+        object.__setattr__(result, '_data', dict(data))
         return result
 
     def as_list(self):
@@ -119,13 +116,13 @@ class Values(object):
             # It is important to discard None values, so migrations in settings can be done
             # without breaking all existing packages SHAs, by adding a first "None" option
             # that doesn't change the final sha
-            # FIXME: BUG HERE "." in name or value.lower() 
+            # FIXME: BUG HERE "." in name or value.lower()
             if "." in name or value.lower() not in ["false", "none", "0", "off", ""]:
                 result.append("%s=%s" % (name, value))
         return sha1('\n'.join(result).encode())
 
     def clear(self):
-        self._data = {}
+        object.__setattr__(self, '_data', {})
 
     def update_values(self, other):
         assert isinstance(other, Values)

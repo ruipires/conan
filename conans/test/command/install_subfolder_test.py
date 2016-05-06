@@ -50,6 +50,7 @@ class InstallSubfolderTest(unittest.TestCase):
                              "os=Windows",
                              conan_info.settings.dumps())
             conan_info_text = load(info_path)
+            print conan_info_text
             self.assertIn(id0, conan_info_text)
             self.assertIn(id1, conan_info_text)
             self.assertNotIn(id2, conan_info_text)

@@ -182,15 +182,15 @@ class ConanManager(object):
         # build deps graph and install it
         builder = DepsBuilder(remote_proxy, self._user_io.out, loader)
         t1 = time.time()
-        #pr = cProfile.Profile()
-        #pr.enable()
+        pr = cProfile.Profile()
+        pr.enable()
         deps_graph = builder.load(reference, conanfile)
-        #pr.disable()
-        #s = cStringIO.StringIO()
-        #sortby = 'cumulative'
-        #ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        #ps.print_stats()
-        #print s.getvalue()
+        pr.disable()
+        s = cStringIO.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        print s.getvalue()
         logger.debug("Time to build graph = %s" % (time.time() - t1))
 
         registry = RemoteRegistry(self._paths.registry, self._user_io.out)
@@ -207,7 +207,7 @@ class ConanManager(object):
 
         if not reference_given:
             if is_txt:
-                conanfile.info.settings = loader._settings.values
+                conanfile.info._settings = loader._settings.values
             # Just in case the current package is header only, we still store the full settings
             # for reference and compiler checks
             conanfile.info.full_settings = loader._settings.values
