@@ -318,7 +318,7 @@ class DepsBuilder(object):
                 if new_node:
                     # RECURSION!
                     self._load_deps(new_node, new_reqs, dep_graph, public_deps, conanref,
-                                    new_options.copy())
+                                    new_options)
             else:  # a public node already exist with this name
                 if previous_node.conan_ref != require.conan_reference:
                     self._output.error("Conflict in %s\n"
@@ -330,7 +330,7 @@ class DepsBuilder(object):
                 dep_graph.add_edge(node, previous_node)
                 # RECURSION!
                 self._load_deps(previous_node, new_reqs, dep_graph, public_deps, conanref,
-                                new_options.copy())
+                                new_options)
 
     def _config_node(self, conanfile, conanref, down_reqs, down_ref, down_options):
         """ update settings and option in the current ConanFile, computing actual

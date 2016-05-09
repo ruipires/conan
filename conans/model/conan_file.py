@@ -1,4 +1,4 @@
-from conans.model.options import Options, PackageOptions, OptionsValues
+from conans.model.options import Options
 from conans.model.requires import Requirements
 from conans.model.build_info import DepsCppInfo
 from conans import tools  # @UnusedImport KEEP THIS! Needed for pyinstaller to copy to exe.
@@ -7,23 +7,13 @@ from conans.errors import ConanException
 
 def create_options(conanfile):
     try:
-        package_options = PackageOptions(getattr(conanfile, "options", None))
-        options = Options(package_options)
-
-        default_options = getattr(conanfile, "default_options", None)
-        if default_options:
-            if isinstance(default_options, tuple):
-                default_values = OptionsValues.loads("\n".join(default_options))
-            elif isinstance(default_options, list):
-                default_values = OptionsValues.from_list(default_options)
-            elif isinstance(default_options, str):
-                default_values = OptionsValues.loads(default_options)
-            else:
-                raise ConanException("Please define your default_options as list or "
-                                     "multiline string")
-            options.values = default_values
+        package_options = getattr(conanfile, "options", None)
+        options_values = getattr(conanfile, "default_options", None)
+        options = Options(package_options, options_values)
         return options
     except Exception as e:
+        import traceback
+        print traceback.format_exc()
         raise ConanException("Error while initializing options. %s" % str(e))
 
 

@@ -121,11 +121,12 @@ class ConanInfo(object):
 
     @staticmethod
     def create(settings, options, requires):
+        assert isinstance(options, OptionsValues)
         result = ConanInfo()
         result.full_settings = settings
         result.settings = settings.copy()
         result.full_options = options
-        result.options = options.copy()
+        result.options = options
         result.options.clear_indirect()
         result.full_requires = RequirementsList(requires)
         result.requires = RequirementsInfo(requires)

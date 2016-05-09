@@ -1,17 +1,16 @@
 import unittest
-from conans.model.options import OptionsValues, PackageOptions, Options
+from conans.model.options import OptionsValues, Options
 from conans.model.ref import ConanFileReference
 from conans.test.tools import TestBufferConanOutput
-from conans.model.values import Values
 
 
 class OptionsTest(unittest.TestCase):
 
     def setUp(self):
-        package_options = PackageOptions.loads("""{static: [True, False],
-        optimized: [2, 3, 4]}""")
-        package_options.values = Values.loads("static=True\noptimized=3")
-        self.sut = Options(package_options)
+        package_options = {"static": [True, False],
+                           "optimized": [2, 3, 4]}
+        values = "static=True\noptimized=3"
+        self.sut = Options(package_options, values)
 
     def items_test(self):
         self.assertEqual(self.sut.items(), [("optimized", "3"), ("static", "True")])
@@ -43,11 +42,11 @@ class OptionsTest(unittest.TestCase):
         output = TestBufferConanOutput()
         self.sut.propagate_upstream(options, down_ref, own_ref, output)
         self.assertEqual(self.sut.values.as_list(), [("optimized", "4"),
-                                                   ("static", "False"),
-                                                   ("Boost:static", "False"),
-                                                   ("Boost:thread", "True"),
-                                                   ("Boost:thread.multi", "off"),
-                                                   ("Poco:deps_bundled", "True")])
+                                                     ("static", "False"),
+                                                     ("Boost:static", "False"),
+                                                     ("Boost:thread", "True"),
+                                                     ("Boost:thread.multi", "off"),
+                                                     ("Poco:deps_bundled", "True")])
 
         options2 = OptionsValues.loads("""other_option=True
         optimized_var=3
@@ -93,7 +92,7 @@ class OptionsValuesTest(unittest.TestCase):
         """)
 
     def test_from_list(self):
-        option_values = OptionsValues.from_list(self.sut.as_list())
+        option_values = OptionsValues(self.sut.as_list())
         self.assertEqual(option_values.dumps(), self.sut.dumps())
 
     def test_dumps(self):

@@ -126,7 +126,7 @@ class ConanFileLoader(object):
         conanfile.generators = parser.generators
 
         options = OptionsValues.loads(parser.options)
-        conanfile.options.values = options
+        conanfile.options.initialize_upstream(options)
         conanfile.options.initialize_upstream(self._options)
 
         # imports method
