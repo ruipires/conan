@@ -1,16 +1,220 @@
-from conans.model.config_dict import ConfigDict
-from conans.model.values import Values
 from conans.util.sha import sha1
 from collections import defaultdict
+from conans.errors import ConanException
+import yaml
+import six
+from sortedcontainers.sorteddict import SortedDict
 
 
-class PackageOptions(ConfigDict):
-    """ Optional configuration of a package. Follows the same syntax as
-    settings and all values will be converted to strings
+class OptionItem(object):
+    """ This is now just a view over a single item
     """
-    def __init__(self, definition=None, name="options", parent_value=None):
-        super(PackageOptions, self).__init__(definition or {}, name, parent_value)
-        self._modified = {}  # {"compiler.version.arch": (old_value, old_reference)}
+    def __init__(self, value, range_values=None):
+        self._value = value
+        self._range = range_values
+
+    def __bool__(self):
+        if not self._value:
+            return False
+        return self._value.lower() not in ["false", "none", "0", "off", ""]
+
+    def __nonzero__(self):
+        return self.__bool__()
+
+    def __str__(self):
+        return self._value
+
+    def __eq__(self, other):
+        if other is None:
+            return self._value is None
+        other = str(other)
+        if self._range and other not in self._range:
+            raise ConanException(bad_value_msg(other, self._range))
+        return other == self._value
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    @property
+    def value(self):
+        return self._value
+
+
+class Values(object):
+    def __init__(self, data=None):
+        self.__dict__["_data"] = SortedDict(data)
+        self.__dict__["_modified"] = {}  # {"compiler.version.arch": (old_value, old_reference)}
+
+    def __getattr__(self, attr):
+        try:
+            return OptionItem(self._data[attr])
+        except KeyError:
+            return None
+
+    def __setattr__(self, attr, value):
+        self._data[attr] = str(value)
+
+    __getitem__ = __getattr__
+    __setitem__ = __setattr__
+
+    @property
+    def fields(self):
+        return self._data.keys()
+
+    @staticmethod
+    def loads(text):
+        result = []
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            name, value = line.split("=")
+            result.append((name.strip(), value.strip()))
+        return Values(result)
+
+    def items(self):
+        return self._data.items()
+
+    iteritems = items
+    as_list = items
+
+    def add(self, option_text):
+        assert isinstance(option_text, six.string_types)
+        name, value = option_text.split("=")
+        self._data[name] = value
+
+    def update(self, other):
+        assert isinstance(other, Values)
+        self._data.update(other._data)
+
+    def propagate_upstream(self, other, down_ref, own_ref, output, package_name):
+        if not other:
+            return
+
+        for (name, value) in other._data.items():
+            current_value = self._data.get(name)
+            if value == current_value:
+                continue
+
+            modified = self._modified.get(name)
+            if modified is not None:
+                modified_value, modified_ref = modified
+                if modified_value == value:
+                    continue
+                else:
+                    output.warn("%s tried to change %s option %s:%s to %s\n"
+                                "but it was already assigned to %s by %s"
+                                % (down_ref, own_ref, package_name, name, value,
+                                   modified_value, modified_ref))
+            else:
+                self._modified[name] = (value, down_ref)
+                self._data[name] = value
+
+    def dumps(self):
+        """ produces a text string with lines containine a flattened version:
+        compiler.arch = XX
+        compiler.arch.speed = YY
+        """
+        return "\n".join(["%s=%s" % (field, value)
+                          for (field, value) in self._data.items()])
+
+    def serialize(self):
+        return self._data.items()
+
+    @staticmethod
+    def deserialize(data):
+        return Values(data)
+
+    @property
+    def sha(self):
+        result = []
+        for (name, value) in self._data.items():
+            # It is important to discard None values, so migrations in settings can be done
+            # without breaking all existing packages SHAs, by adding a first "None" option
+            # that doesn't change the final sha
+            if value and value.lower() not in ["false", "none", "0", "off"]:
+                result.append("%s=%s" % (name, value))
+        return sha1('\n'.join(result).encode())
+
+
+def bad_value_msg(value, value_range):
+    return ("'%s' is not a valid 'option' value.\nPossible values are %s" % (value, value_range))
+
+
+def undefined_field(field, fields=None):
+    result = ["'%s' doesn't exist" % (field)]
+    result.append("'%s' possible configurations are %s" % (fields or "none"))
+    return "\n".join(result)
+
+
+def undefined_value(name):
+    return "'%s' value not defined" % name
+
+
+class ConfigItem(OptionItem):
+    """ This is now just a view over the single level COnfigDict
+    """
+    def remove(self, values):
+        if not self._range:
+            return
+        if not isinstance(values, (list, tuple, set)):
+            values = [values]
+        for v in values:
+            v = str(v)
+            if self._value == v:
+                raise ConanException(bad_value_msg(v, self._range))
+            try:
+                self._range.remove(v)
+            except ValueError:
+                pass  # not in list
+
+
+class PackageOptions(object):
+    def __init__(self, definition, values):
+        self._data = {str(k): [str(v) for v in vals] for k, vals in definition.items()}
+        self._values = Values(values)
+
+    @property
+    def fields(self):
+        return sorted(list(self._data.keys()))
+
+    def remove(self, item):
+        if not isinstance(item, (list, tuple, set)):
+            item = [item]
+        for it in item:
+            it = str(it)
+            self._data.pop(it, None)
+
+    def clear(self):
+        self._data = {}
+        self._values = Values()
+
+    def _ranges(self, field):
+        try:
+            return self._data[field]
+        except KeyError:
+            raise ConanException(undefined_field(field, self.fields))
+
+    def __getattr__(self, field):
+        ranges = self._ranges(field)
+        value = self._values[field]
+        return OptionItem(value, ranges)
+
+    def __setattr__(self, field, value):
+        ranges = self._ranges(field)
+        value = str(value)
+        if ranges and value not in ranges:
+            raise ConanException(bad_value_msg(value, ranges))
+        self._values[field] = value
+
+    @property
+    def values(self):
+        return self._values
+
+    def items(self):
+        return self._values.items()
+
+    def iteritems(self):
+        return self._values.iteritems()
 
     def propagate_upstream(self, values, down_ref, own_ref, output):
         """ update must be controlled, to not override lower
@@ -48,7 +252,7 @@ class Options(object):
     ones.
     Owned by conanfile
     """
-    def __init__(self, options):
+    def __init__(self, options, values):
         assert isinstance(options, PackageOptions)
         self._options = options
         # Addressed only by name, as only 1 configuration is allowed
