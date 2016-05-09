@@ -159,4 +159,5 @@ class Values(object):
             # that doesn't change the final sha
             if value != "None":
                 result.append("%s=%s" % (name, value))
+        print "Value sha ", result, " sha ", sha1('\n'.join(result).encode())
         return sha1('\n'.join(result).encode())

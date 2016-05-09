@@ -190,6 +190,9 @@ class ConanInfo(object):
         """ The package_id of a conans is the sha1 of its specific requirements,
         options and settings
         """
+        cached_id = getattr(self, "_package_id", None)
+        if cached_id is not None:
+            return cached_id
         print "*"*50
         result = []
         print "ID: Settings sha ", self.settings.sha
@@ -198,9 +201,10 @@ class ConanInfo(object):
         result.append(self.settings.sha)
         result.append(self.options.sha)
         result.append(self.requires.sha)
-        print "ID: FINAL SHA ", sha1('\n'.join(result).encode())
+        self._package_id = sha1('\n'.join(result).encode())
+        print "ID: FINAL SHA ", self._package_id
         print "*"*50
-        return sha1('\n'.join(result).encode())
+        return self._package_id
 
     def serialize(self):
         conan_info_json = {"settings": self.settings.serialize(),
