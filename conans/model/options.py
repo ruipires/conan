@@ -420,7 +420,8 @@ class OptionsValues(object):
         result = []
         print "self sha ", self._package_values.sha
         result.append(self._package_values.sha)
-        for name, value in self.as_list():
+        for name, value in self._values.items():
+            assert isinstance(value, Values)
             print "Value sha ", name, "= ", value.sha
             result.append(value.sha)
         return sha1('\n'.join(result).encode())
