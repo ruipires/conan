@@ -191,7 +191,7 @@ class PackageOptions(object):
             self._values.remove(it)
 
     def clear(self):
-        self._data = {}
+        self.__dict__["_data"] = {}
         self._values.clear()
 
     def _ranges(self, field):
@@ -424,6 +424,7 @@ class OptionsValues(object):
             assert isinstance(value, Values)
             print "Value sha ", name, "= ", value.sha
             result.append(value.sha)
+        print "FINAL SHA ", sha1('\n'.join(result).encode())
         return sha1('\n'.join(result).encode())
 
     def serialize(self):
@@ -436,8 +437,16 @@ class OptionsValues(object):
 
     @staticmethod
     def deserialize(data):
-        values = {k: Values(v) for k, v in data["req_options"].items()}
-        return OptionsValues(data["options"], values)
+        result = OptionsValues()
+        for k, v in data["req_options"].items():
+            result._values[k] = Values.deserialize(v)
+        result.__dict__["_package_values"] = Values.deserialize(data["options"])
+        return result
 
     def update(self, name, values):
-        raise Exception("BOOM2")
+        print "OptionsValues: update PRE", name, values, self._values
+        if name not in self._values:
+            self._values[name] = values
+        else:
+            self._values[name].update(values)
+        print "OptionsValues: update POST", name, values, self._values

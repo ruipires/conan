@@ -5,6 +5,7 @@ from conans.util.config_parser import ConfigParser
 from conans.util.files import load
 from conans.model.values import Values
 from conans.model.options import OptionsValues
+import copy
 
 
 class RequirementInfo(object):
@@ -126,7 +127,7 @@ class ConanInfo(object):
         result.full_settings = settings
         result.settings = settings.copy()
         result.full_options = options
-        result.options = options
+        result.options = OptionsValues(options.as_list())  # FIXME: Naive copy
         result.options.clear_indirect()
         result.full_requires = RequirementsList(requires)
         result.requires = RequirementsInfo(requires)
@@ -189,10 +190,16 @@ class ConanInfo(object):
         """ The package_id of a conans is the sha1 of its specific requirements,
         options and settings
         """
+        print "*"*50
         result = []
+        print "ID: Settings sha ", self.settings.sha
+        print "ID: Options sha ", self.options, " sha= ", self.options.sha
+        print "ID: Requires sha ", self.requires, " reqs= ", self.requires.sha
         result.append(self.settings.sha)
         result.append(self.options.sha)
         result.append(self.requires.sha)
+        print "ID: FINAL SHA ", sha1('\n'.join(result).encode())
+        print "*"*50
         return sha1('\n'.join(result).encode())
 
     def serialize(self):

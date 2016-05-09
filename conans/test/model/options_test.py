@@ -33,7 +33,7 @@ class OptionsTest(unittest.TestCase):
         Poco:deps_bundled=True
         Boost:static=False
         Boost:thread=True
-        Boost:thread.multi=off
+        Boost:thread_multi=off
         Hello1:static=False
         Hello1:optimized=4
         """)
@@ -45,29 +45,30 @@ class OptionsTest(unittest.TestCase):
                                                      ("static", "False"),
                                                      ("Boost:static", "False"),
                                                      ("Boost:thread", "True"),
-                                                     ("Boost:thread.multi", "off"),
+                                                     ("Boost:thread_multi", "off"),
                                                      ("Poco:deps_bundled", "True")])
+
 
         options2 = OptionsValues.loads("""other_option=True
         optimized_var=3
         Poco:deps_bundled=What
         Boost:static=2
         Boost:thread=Any
-        Boost:thread.multi=on
+        Boost:thread_multi=on
         Hello1:static=True
         Hello1:optimized=2
         """)
         down_ref = ConanFileReference.loads("Hello2/0.1@diego/testing")
         self.sut.propagate_upstream(options2, down_ref, own_ref, output)
-        self.assertIn("""WARN: Hello2/0.1@diego/testing tried to change Hello1/0.1@diego/testing option optimized to 2
+        self.assertIn("""WARN: Hello2/0.1@diego/testing tried to change Hello1/0.1@diego/testing option Hello1:optimized to 2
 but it was already assigned to 4 by Hello0/0.1@diego/testing
-WARN: Hello2/0.1@diego/testing tried to change Hello1/0.1@diego/testing option static to True
+WARN: Hello2/0.1@diego/testing tried to change Hello1/0.1@diego/testing option Hello1:static to True
 but it was already assigned to False by Hello0/0.1@diego/testing
 WARN: Hello2/0.1@diego/testing tried to change Hello1/0.1@diego/testing option Boost:static to 2
 but it was already assigned to False by Hello0/0.1@diego/testing
 WARN: Hello2/0.1@diego/testing tried to change Hello1/0.1@diego/testing option Boost:thread to Any
 but it was already assigned to True by Hello0/0.1@diego/testing
-WARN: Hello2/0.1@diego/testing tried to change Hello1/0.1@diego/testing option Boost:thread.multi to on
+WARN: Hello2/0.1@diego/testing tried to change Hello1/0.1@diego/testing option Boost:thread_multi to on
 but it was already assigned to off by Hello0/0.1@diego/testing
 WARN: Hello2/0.1@diego/testing tried to change Hello1/0.1@diego/testing option Poco:deps_bundled to What
 but it was already assigned to True by Hello0/0.1@diego/testing""", str(output))
@@ -76,7 +77,7 @@ but it was already assigned to True by Hello0/0.1@diego/testing""", str(output))
 static=False
 Boost:static=False
 Boost:thread=True
-Boost:thread.multi=off
+Boost:thread_multi=off
 Poco:deps_bundled=True""")
 
 
@@ -88,7 +89,7 @@ class OptionsValuesTest(unittest.TestCase):
         Poco:deps_bundled=True
         Boost:static=False
         Boost:thread=True
-        Boost:thread.multi=off
+        Boost:thread_multi=off
         """)
 
     def test_from_list(self):
@@ -100,11 +101,11 @@ class OptionsValuesTest(unittest.TestCase):
                                                      "static=True",
                                                      "Boost:static=False",
                                                      "Boost:thread=True",
-                                                     "Boost:thread.multi=off",
+                                                     "Boost:thread_multi=off",
                                                      "Poco:deps_bundled=True"]))
 
     def test_sha_constant(self):
-        self.assertEqual(self.sut.sha, "7e406fc70a1c40b597353b39a0c0a605e9f95332")
+        self.assertEqual(self.sut.sha, "2442d43f1d558621069a15ff5968535f818939b5")
         self.sut.new_option = False
         self.sut["Boost"].new_option = "off"
         self.sut["Poco"].new_option = 0
@@ -115,7 +116,7 @@ class OptionsValuesTest(unittest.TestCase):
                                                      "Boost:new_option=off",
                                                      "Boost:static=False",
                                                      "Boost:thread=True",
-                                                     "Boost:thread.multi=off",
+                                                     "Boost:thread_multi=off",
                                                      "Poco:deps_bundled=True",
                                                      "Poco:new_option=0"]))
-        self.assertEqual(self.sut.sha, "7e406fc70a1c40b597353b39a0c0a605e9f95332")
+        self.assertEqual(self.sut.sha, "2442d43f1d558621069a15ff5968535f818939b5")
