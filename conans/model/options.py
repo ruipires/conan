@@ -1,12 +1,11 @@
 from conans.util.sha import sha1
 from collections import defaultdict
 from conans.errors import ConanException
-import yaml
-import six
 from sortedcontainers.sorteddict import SortedDict
+import copy
 
 
-class OptionItem(object):
+class ValueItem(object):
     """ This is now just a view over a single item
     """
     def __init__(self, value, range_values=None):
@@ -43,14 +42,14 @@ class OptionItem(object):
 
 class Values(object):
     def __init__(self, data=None):
-        if data:  # list
+        if data:  # list of tuples
             data = [(str(k), str(v)) for (k, v) in data]
         self.__dict__["_data"] = SortedDict(data)
         self.__dict__["_modified"] = {}  # {"compiler.version.arch": (old_value, old_reference)}
 
     def __getattr__(self, attr):
         try:
-            return OptionItem(self._data[attr])
+            return ValueItem(self._data[attr])
         except KeyError:
             return None
 
@@ -70,7 +69,7 @@ class Values(object):
 
     @property
     def fields(self):
-        return self._data.keys()
+        return list(self._data.keys())
 
     def items(self):
         return self._data.items()
@@ -83,6 +82,9 @@ class Values(object):
         self._data.update(other._data)
 
     def propagate_upstream(self, other, down_ref, own_ref, output, package_name):
+        print "Values: propagate upstream ", other, down_ref, own_ref, package_name
+        print "Values: propagate upstream data ", self._data
+
         if not other:
             return
 
@@ -105,14 +107,7 @@ class Values(object):
             else:
                 self._modified[name] = (value, down_ref)
                 self._data[name] = value
-
-    def dumps(self):
-        """ produces a text string with lines containine a flattened version:
-        compiler.arch = XX
-        compiler.arch.speed = YY
-        """
-        return "\n".join(["%s=%s" % (field, value)
-                          for (field, value) in self._data.items()])
+        print "Values: propagate upstream data END ", self._data
 
     def serialize(self):
         return self._data.items()
@@ -133,7 +128,125 @@ class Values(object):
         return sha1('\n'.join(result).encode())
 
     def __repr__(self):
+        return "\n".join(["%s=%s" % (field, value) for (field, value) in self._data.items()])
+
+
+class OptionsValues(object):
+    """ static= True,
+    Boost:static = False,
+    Poco:optimized = True
+    """
+    def __init__(self, values=None):
+        values = values or []
+        assert isinstance(values, list)
+        values_dict = defaultdict(list)
+        values_dict[None] = []
+        for (k, v) in values:
+            tokens = k.split(":")
+            if len(tokens) == 2:
+                package, option = tokens
+            else:
+                package = None
+                option = k
+            values_dict[package].append((option, str(v)))
+        package_options = values_dict.pop(None)
+        values = {k: Values(v) for k, v in values_dict.items()}
+        self.__dict__["_package_values"] = Values(package_options)
+        self.__dict__["_values"] = SortedDict(values)  # {name("Boost": Values}
+
+    def copy(self):
+        result = OptionsValues()
+        result.__dict__["_package_values"] = Values(self._package_values.items())
+        result.__dict__["_values"] = SortedDict(self._values)
+        return result
+
+    @staticmethod
+    def loads(text):
+        value_list = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            name, value = line.split("=")
+            value_list.append((name.strip(), value.strip()))
+        return OptionsValues(value_list)
+
+    def __getitem__(self, item):
+        return self._values.setdefault(item, Values())
+
+    def __setitem__(self, item, values):
+        if not isinstance(values, Values):
+            values = Values(values)
+        self._values[item] = values
+
+    def pop(self, item):
+        return self._values.pop(item, None)
+
+    def __repr__(self):
         return self.dumps()
+
+    def __getattr__(self, attr):
+        return getattr(self._package_values, attr)
+
+    def __setattr__(self, attr, value):
+        return setattr(self._package_values, attr, value)
+
+    def clear_indirect(self):
+        for v in self._values.values():
+            v.clear()
+
+    def as_list(self):
+        result = []
+        options_list = self._package_values.as_list()
+        if options_list:
+            result.extend(options_list)
+        for k, v in self._values.items():
+            for line in v.as_list():
+                line_key, line_value = line
+                result.append(("%s:%s" % (k, line_key), line_value))
+        return result
+
+    def dumps(self):
+        result = []
+        for key, value in self.as_list():
+            result.append("%s=%s" % (key, value))
+        return "\n".join(result)
+
+    @property
+    def sha(self):
+        result = []
+        print "self sha ", self._package_values.sha
+        result.append(self._package_values.sha)
+        print "SHA KEYS ", self._values.keys()
+        for name, value in self._values.items():
+            assert isinstance(value, Values)
+            print "Value sha ", name, "= ", value.sha
+            result.append(value.sha)
+        print "FINAL SHA ", sha1('\n'.join(result).encode())
+        return sha1('\n'.join(result).encode())
+
+    def serialize(self):
+        ret = {}
+        ret["options"] = self._package_values.serialize()
+        ret["req_options"] = {}
+        for name, values in self._values.items():
+            ret["req_options"][name] = values.serialize()
+        return ret
+
+    @staticmethod
+    def deserialize(data):
+        result = OptionsValues()
+        for k, v in data["req_options"].items():
+            result._values[k] = Values.deserialize(v)
+        result.__dict__["_package_values"] = Values.deserialize(data["options"])
+        return result
+
+    def update(self, name, values):
+        print "OptionsValues: update PRE", name, values, self._values
+        if name not in self._values:
+            self._values[name] = Values()
+        self._values[name].update(values)
+        print "OptionsValues: update POST", name, values, self._values
 
 
 def bad_value_msg(value, value_range):
@@ -150,7 +263,7 @@ def undefined_value(name):
     return "'%s' value not defined" % name
 
 
-class ConfigItem(OptionItem):
+class ConfigItem(ValueItem):
     """ This is now just a view over the single level COnfigDict
     """
     def remove(self, values):
@@ -176,7 +289,10 @@ class PackageOptions(object):
 
     def validate(self):
         # FIXME: implement
-        return True
+        fields = self._values.fields
+        for k in self._data:
+            if k not in fields:
+                raise ConanException("Option value '%s' not defined" % k)
 
     @property
     def fields(self):
@@ -203,7 +319,7 @@ class PackageOptions(object):
     def __getattr__(self, field):
         ranges = self._ranges(field)
         value = self._values[field]
-        return OptionItem(value.value, ranges)
+        return ValueItem(value.value, ranges)
 
     def __setattr__(self, field, value):
         ranges = self._ranges(field)
@@ -248,7 +364,7 @@ class Options(object):
     ones.
     Owned by conanfile
     """
-    def __init__(self, options, values):
+    def __init__(self, options, values=None):
         values = values or []
         options = options or {}
         if isinstance(values, tuple):
@@ -288,21 +404,21 @@ class Options(object):
         print "Options: Returngin Package values ", self._values
         return self._values
 
-    @values.setter
-    def values(self, v):
-        raise NotImplementedError("WHO IS SETTING ME?")
-
     def propagate_upstream(self, values, down_ref, own_ref, output):
         """ used to propagate from downstream the options to the upper requirements
         """
         if values is not None:
+            own_name = own_ref.name
+            print "Options: propagate upstream ", values, " DOWN_REF=", down_ref, " OWN_REF=", own_ref
             assert isinstance(values, OptionsValues)
-            own_values = values._values.get(own_ref.name)
+            own_values = values._values.get(own_name)
             if own_values:
+                print "Propagating self ", own_values
                 self._package_options.propagate_upstream(own_values, down_ref, own_ref, output,
-                                                         own_ref.name)
+                                                         own_name)
             for name, option_values in values._values.items():
-                if name != own_ref.name:
+                print "Propagating other ", name, " values=", option_values
+                if name != own_name:
                     self._values[name].propagate_upstream(option_values, down_ref, own_ref, output,
                                                           name)
 
@@ -325,7 +441,7 @@ class Options(object):
         print "Options: Propagating downstream PRE ", self._values
         self._values[ref.name] = options._package_values
         for k, v in options._values.items():
-            self._values[k] = v
+            self._values[k] = v.copy()
         print "Options: Propagating downstream POST ", self._values
 
     def clear_unused(self, references):
@@ -338,115 +454,3 @@ class Options(object):
             if name not in existing_names:
                 self._values.pop(name)
         print "Options: Clear unused POST ", self._values
-
-
-class OptionsValues(object):
-    """ static= True,
-    Boost.static = False,
-    Poco.optimized = True
-    """
-    def __init__(self, values=None):
-        values = values or []
-        assert isinstance(values, list)
-        values_dict = defaultdict(list)
-        values_dict[None] = []
-        for (k, v) in values:
-            tokens = k.split(":")
-            if len(tokens) == 2:
-                package, option = tokens
-            else:
-                package = None
-                option = k
-            values_dict[package].append((option, str(v)))
-        package_options = values_dict.pop(None)
-        values = {k: Values(v) for k, v in values_dict.items()}
-        self.__dict__["_package_values"] = Values(package_options)
-        self.__dict__["_values"] = SortedDict(values)  # {name("Boost": Values}
-
-    @staticmethod
-    def loads(text):
-        value_list = []
-        for line in text.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            name, value = line.split("=")
-            value_list.append((name.strip(), value.strip()))
-        return OptionsValues(value_list)
-
-    def __getitem__(self, item):
-        return self._values.setdefault(item, Values())
-
-    def __setitem__(self, item, values):
-        assert isinstance(values, Values)
-        self._values[item] = values
-
-    def pop(self, item):
-        return self._values.pop(item, None)
-
-    def __repr__(self):
-        return self.dumps()
-
-    def __getattr__(self, attr):
-        return getattr(self._package_values, attr)
-
-    def __setattr__(self, attr, value):
-        print "OptionsValues: settattr ", attr, value
-        return setattr(self._package_values, attr, value)
-
-    def clear_indirect(self):
-        for v in self._values.values():
-            v.clear()
-
-    def as_list(self):
-        result = []
-        options_list = self._package_values.as_list()
-        if options_list:
-            result.extend(options_list)
-        for k, v in self._values.items():
-            for line in v.as_list():
-                line_key, line_value = line
-                result.append(("%s:%s" % (k, line_key), line_value))
-        return result
-
-    def dumps(self):
-        result = []
-        for key, value in self.as_list():
-            result.append("%s=%s" % (key, value))
-        return "\n".join(result)
-
-    @property
-    def sha(self):
-        result = []
-        print "self sha ", self._package_values.sha
-        result.append(self._package_values.sha)
-        for name, value in self._values.items():
-            assert isinstance(value, Values)
-            print "Value sha ", name, "= ", value.sha
-            result.append(value.sha)
-        print "FINAL SHA ", sha1('\n'.join(result).encode())
-        return sha1('\n'.join(result).encode())
-
-    def serialize(self):
-        ret = {}
-        ret["options"] = self._package_values.serialize()
-        ret["req_options"] = {}
-        for name, values in self._values.items():
-            ret["req_options"][name] = values.serialize()
-        return ret
-
-    @staticmethod
-    def deserialize(data):
-        result = OptionsValues()
-        for k, v in data["req_options"].items():
-            result._values[k] = Values.deserialize(v)
-        result.__dict__["_package_values"] = Values.deserialize(data["options"])
-        return result
-
-    def update(self, name, values):
-        print "OptionsValues: update PRE", name, values, self._values
-        if name not in self._values:
-            self._values[name] = values
-        else:
-            self._values[name].update(values)
-        print "OptionsValues: update POST", name, values, self._values

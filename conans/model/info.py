@@ -101,6 +101,9 @@ class RequirementsInfo(object):
             ret._data[ref] = RequirementInfo.deserialize(requinfo)
         return ret
 
+    def __repr__(self):
+        return ", ".join(str(r) for r in self._data.keys())
+
 
 class RequirementsList(list):
     @staticmethod
@@ -126,8 +129,8 @@ class ConanInfo(object):
         result = ConanInfo()
         result.full_settings = settings
         result.settings = settings.copy()
-        result.full_options = options
-        result.options = OptionsValues(options.as_list())  # FIXME: Naive copy
+        result.full_options = options.copy()
+        result.options = options.copy()  # FIXME: Naive copy
         result.options.clear_indirect()
         result.full_requires = RequirementsList(requires)
         result.requires = RequirementsInfo(requires)

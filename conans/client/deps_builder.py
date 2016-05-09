@@ -153,9 +153,11 @@ class DepsGraph(object):
                 # There might be options that are not upstream
                 conanfile.options.clear_unused(indirect_reqs.union(direct_reqs))
 
+                print "ORDERED 0 ", ordered[0][0].conanfile.options.values
                 conanfile.info = ConanInfo.create(conanfile.settings.values,
                                                   conanfile.options.values,
                                                   direct_reqs)
+                print "ORDERED 0 ", ordered[0][0].conanfile.options.values
                 conanfile.info.requires.add(indirect_reqs)
                 conanfile.info.full_requires.extend(indirect_reqs)
 
