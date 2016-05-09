@@ -129,7 +129,7 @@ class ConanInfo(object):
         result = ConanInfo()
         result.full_settings = settings
         result.settings = settings.copy()
-        result.full_options = options.copy()
+        result.full_options = options
         result.options = options.copy()  # FIXME: Naive copy
         result.options.clear_indirect()
         result.full_requires = RequirementsList(requires)

@@ -2,7 +2,6 @@ from conans.util.sha import sha1
 from collections import defaultdict
 from conans.errors import ConanException
 from sortedcontainers.sorteddict import SortedDict
-import copy
 
 
 class ValueItem(object):
@@ -47,11 +46,14 @@ class Values(object):
         self.__dict__["_data"] = SortedDict(data)
         self.__dict__["_modified"] = {}  # {"compiler.version.arch": (old_value, old_reference)}
 
+    def copy(self):
+        return Values(self._data.items())
+
     def __getattr__(self, attr):
         try:
             return ValueItem(self._data[attr])
         except KeyError:
-            return None
+            raise ConanException(undefined_field(attr, self.fields))
 
     def __setattr__(self, attr, value):
         self._data[attr] = str(value)
@@ -152,12 +154,14 @@ class OptionsValues(object):
         package_options = values_dict.pop(None)
         values = {k: Values(v) for k, v in values_dict.items()}
         self.__dict__["_package_values"] = Values(package_options)
+        print "CREATING OPTIONS VALUES ", values
         self.__dict__["_values"] = SortedDict(values)  # {name("Boost": Values}
 
     def copy(self):
-        result = OptionsValues()
-        result.__dict__["_package_values"] = Values(self._package_values.items())
-        result.__dict__["_values"] = SortedDict(self._values)
+        result = OptionsValues(self.as_list())
+        for k in self._values:
+            if k not in result._values:
+                result._values[k] = Values()
         return result
 
     @staticmethod
@@ -441,6 +445,7 @@ class Options(object):
         print "Options: Propagating downstream PRE ", self._values
         self._values[ref.name] = options._package_values
         for k, v in options._values.items():
+            assert isinstance(v, Values)
             self._values[k] = v.copy()
         print "Options: Propagating downstream POST ", self._values
 

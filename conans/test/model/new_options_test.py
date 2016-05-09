@@ -30,6 +30,14 @@ class OptionsTest(unittest.TestCase):
 
         self.assertEqual(values.fields, ["a", "b", "c"])
 
+        with self.assertRaises(ConanException):
+            values.d
+
+        # Creation
+        values.d = 3
+        self.assertEqual(values.d, "3")
+        self.assertEqual(values.fields, ["a", "b", "c", "d"])
+
     def values_propagate_test(self):
         values = Values([("c", "off"), ("a", 2), ("b", 4)])
         down_values = Values([("a", 5), ("d", 123)])

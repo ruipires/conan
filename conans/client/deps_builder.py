@@ -147,7 +147,7 @@ class DepsGraph(object):
                     package_reference = PackageReference(nref, package_id)
                     direct_reqs.append(package_reference)
                     indirect_reqs.update(nconan.info.requires.refs())
-                    conanfile.options.propagate_downstream(nref, nconan.info.full_options)
+                    conanfile.options.propagate_downstream(nref, nconan.options.values)
                     # Might be never used, but update original requirement, just in case
                     conanfile.requires[nref.name].conan_reference = nref
                 # There might be options that are not upstream

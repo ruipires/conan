@@ -215,6 +215,7 @@ class ConanRequirementsTest(unittest.TestCase):
         self.assertEqual(conaninfo.options.dumps(), "")
         self.assertEqual(conaninfo.full_options.dumps(), "")
         self.assertEqual(conaninfo.requires.dumps(), "Hello/1.Y.Z")
+        print conaninfo.full_requires.dumps()
         self.assertEqual(conaninfo.full_requires.dumps(),
                          "Hello/1.2@diego/testing:0b09634eb446bffb8d3042a3f19d813cfc162b9d\n"
                          "Say/0.1@diego/testing:5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9")
@@ -659,9 +660,10 @@ class ChatConan(ConanFile):
 
         with self.assertRaises(ConanException) as cm:
             self.root(chat_content)
+        print cm.exception
         self.assertEqual(str(cm.exception),
-                         "Say/0.1@diego/testing: %s" % undefined_field("options", "myoption2",
-                                                                       ['myoption']))
+                         "Say/0.1@diego/testing: 'myoption2' doesn't exist\n"
+                        " possible configurations are ['myoption']")
 
         chat_content = """
 from conans import ConanFile
@@ -677,8 +679,9 @@ class ChatConan(ConanFile):
 
         with self.assertRaises(ConanException) as cm:
             self.root(chat_content)
-        self.assertEqual(str(cm.exception),  "Say/0.1@diego/testing: %s"
-                         % bad_value_msg("options.myoption", "235", ["123", "234"]))
+        print cm.exception
+        self.assertEqual(str(cm.exception),  "Say/0.1@diego/testing: '235' is not a valid 'option' value.\n"
+                                    "Possible values are ['123', '234']")
 
     def test_diamond_no_conflict_options(self):
         say_content = """
@@ -798,8 +801,9 @@ class ChatConan(ConanFile):
                                             Edge(bye, say), Edge(chat, bye)})
 
         self._check_say(say.conanfile, options="myoption=234")
+        print self.output
         self.assertIn("Bye/0.2@diego/testing tried to change Say/0.1@diego/testing "
-                      "option myoption to 123 but it was already assigned to 234 "
+                      "option Say:myoption to 123 but it was already assigned to 234 "
                       "by Hello/1.2@diego/testing", str(self.output).replace("\n", " "))
         self.assertEqual(4, len(deps_graph.nodes))
         hello = _get_nodes(deps_graph, "Hello")[0]
