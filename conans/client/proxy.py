@@ -5,7 +5,7 @@ from conans.errors import (ConanException, ConanConnectionError, ConanOutdatedCl
                            NotFoundException)
 from conans.client.remote_registry import RemoteRegistry
 from conans.util.log import logger
-from conans.paths import package_exists, CONANFILE
+from conans.paths import package_exists
 from conans.client.loader import ConanFileLoader
 
 
