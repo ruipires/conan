@@ -13,9 +13,9 @@ class RequireResolver(object):
         version_range = require.version_range()
         if not version_range:
             return
-
         ref = require.conan_reference
         search_ref = ConanFileReference(ref.name, "*", ref.user, ref.channel)
+        search_ref = str(search_ref)
         resolved = self._resolve_local(search_ref, version_range)
         if not resolved:
             remote_found = self._remote_search.search_remotes(search_ref)
@@ -25,7 +25,7 @@ class RequireResolver(object):
         if resolved:
             require.conan_reference = resolved
         else:
-            raise ConanException("The version in '%s' could not be resolved")
+            raise ConanException("The version in '%s' could not be resolved" % require)
 
     def _resolve_local(self, search_ref, version_range):
         if self._local_search:

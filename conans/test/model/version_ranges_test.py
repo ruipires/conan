@@ -49,16 +49,12 @@ class Retriever(object):
 
         subdirs = list_folder_subdirs(basedir=self.folder, level=4)
 
-        if not pattern:
-            return sorted([ConanFileReference(*folder.split("/")) for folder in subdirs])
-        else:
-            ret = []
-            for subdir in subdirs:
-                conan_ref = ConanFileReference(*subdir.split("/"))
-                if pattern:
-                    if pattern.match(str(conan_ref)):
-                        ret.append(conan_ref)
-            return sorted(ret)
+        ret = []
+        for subdir in subdirs:
+            conan_ref = ConanFileReference(*subdir.split("/"))
+            if pattern.match(str(conan_ref)):
+                ret.append(conan_ref)
+        return sorted(ret)
 
 say_content = """
 from conans import ConanFile
