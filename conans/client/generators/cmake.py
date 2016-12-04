@@ -1,13 +1,21 @@
 from conans.model import Generator
 from conans.paths import BUILD_INFO_CMAKE
+from os.path import exists
+from os import listdir
 
+def exclude_useless_dirs(dir_list):
+    result = []
+    for d in dir_list:
+        if exists(d) and listdir(d):
+            result.append(d)
+    return result
 
 class DepsCppCmake(object):
     def __init__(self, deps_cpp_info):
         self.include_paths = "\n\t\t\t".join('"%s"' % p.replace("\\", "/")
                                              for p in deps_cpp_info.include_paths)
         self.lib_paths = "\n\t\t\t".join('"%s"' % p.replace("\\", "/")
-                                         for p in deps_cpp_info.lib_paths)
+                                         for p in exclude_useless_dirs(deps_cpp_info.lib_paths))
         self.libs = " ".join(deps_cpp_info.libs)
         self.defines = "\n\t\t\t".join("-D%s" % d for d in deps_cpp_info.defines)
         self.cppflags = " ".join(deps_cpp_info.cppflags)
